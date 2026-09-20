@@ -17,7 +17,7 @@ public class Main {
 
             window.setSize(800, 600);
 
-            Entity entity = new Entity(350, 250, 50);
+            Entity entity = new Entity(375, 225, 50);
             GamePanel panel = new GamePanel(entity);
             window.add(panel, BorderLayout.CENTER);
 
