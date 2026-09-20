@@ -4,21 +4,25 @@ import javax.swing.JPanel;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
 
 public class GamePanel extends JPanel{
-    private final Entity entity;
+    private final List<Entity> entities;
 
-    public GamePanel(Entity entity) {
-        this.entity = entity;
+    public GamePanel(List<Entity> entities) {
+        this.entities = entities;
 
             addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                System.out.println("(" + e.getX() + " ," + e.getY() + ")");
-                if (entity.contains(e.getX(), e.getY())) {
-                    System.out.println("Hit!");
-                    entity.cycleType();
-                    repaint();
+                for (Entity entity : entities) {
+                    if (entity.contains(e.getX(), e.getY())) {
+                        System.out.println("(" + e.getX() + " ," + e.getY() + ")");
+                        System.out.println("Hit!");
+                        entity.cycleType();
+                        repaint();
+                        break;
+                    }
                 }
             }
         });
@@ -27,6 +31,8 @@ public class GamePanel extends JPanel{
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        entity.draw(g);
+        for (Entity entity : entities) {
+            entity.draw(g);
+        }
     }
 }
