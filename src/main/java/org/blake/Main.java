@@ -9,8 +9,8 @@ import java.awt.*;
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame window = new JFrame("rts game");
-            JLabel message = new JLabel("its peak", SwingConstants.CENTER);
+            JFrame window = new JFrame("RTS Game");
+            JLabel message = new JLabel("Its Peak", SwingConstants.CENTER);
 
             window.add(message, BorderLayout.NORTH);
             window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
