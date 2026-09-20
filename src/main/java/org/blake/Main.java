@@ -4,17 +4,23 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import java.awt.*;
 
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame window = new JFrame("rts game");
-
             JLabel message = new JLabel("its peak", SwingConstants.CENTER);
 
-            window.add(message);
-            window.setSize(500, 300);
+            window.add(message, BorderLayout.NORTH);
             window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+            window.setSize(800, 600);
+
+            Entity entity = new Entity(350, 250, 50);
+            GamePanel panel = new GamePanel(entity);
+            window.add(panel, BorderLayout.CENTER);
+
             window.setLocationRelativeTo(null);
             window.setVisible(true);
         });
