@@ -1,5 +1,7 @@
 package org.blake;
 
+import org.apache.logging.log4j.core.pattern.AbstractStyleNameConverter;
+
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
@@ -7,6 +9,7 @@ import javax.swing.SwingUtilities;
 import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
+import java.awt.Color;
 
 public class Main {
     public static void main(String[] args) {
@@ -18,16 +21,16 @@ public class Main {
 
             List<Entity> entities = new ArrayList<>();
 
-            for (int row = 0; row < 15; row++) {
-                for (int col = 0; col < 30; col++){
-                    int x = 13 + col * 25;
-                    int y = 25 + row * 25;
-                    entities.add(new Entity(x, y, 25));
-                }
+            int rows = 30;
+            int cols = 60;
+            int entitySize = 25;
+            int spacing = 25;
+
+            for (int i = 0; i < rows * cols; i++) {
+                entities.add(new Entity(0, 0, entitySize));
             }
 
-            Entity entity = new Entity(3750, 225, 50);
-            GamePanel panel = new GamePanel(entities);
+            GamePanel panel = new GamePanel(entities, rows, cols, spacing, entitySize);
             window.add(panel, BorderLayout.CENTER);
 
             window.setLocationRelativeTo(null);

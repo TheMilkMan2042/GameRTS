@@ -9,7 +9,7 @@ public class Entity {
     private EntityType type;
 
     public enum EntityType {
-        NEUTRAL(Color.WHITE),
+        NEUTRAL(Color.GRAY),
         FRIENDLY(Color.BLUE),
         ENEMY(Color.RED);
 
