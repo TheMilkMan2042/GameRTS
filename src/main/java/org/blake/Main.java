@@ -18,7 +18,7 @@ public class Main {
             window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             window.setSize(800, 600);
 
-            JLabel powerLabel = new JLabel("Power: 1", SwingConstants.CENTER);
+            JLabel powerLabel = new JLabel("Power: 1.00", SwingConstants.CENTER);
             window.add(powerLabel, BorderLayout.NORTH);
 
             int rows = 30;
@@ -36,7 +36,7 @@ public class Main {
             GamePanel panel = new GamePanel(entities, rows, cols, spacing);
             window.add(panel, BorderLayout.CENTER);
 
-            Timer labelTimer = new Timer(200, e -> powerLabel.setText("Power: " + panel.getPlayerPower()));
+            Timer labelTimer = new Timer(200, e -> powerLabel.setText(String.format("Power: %.2f", panel.getPlayerPower())));
             labelTimer.start();
 
             window.setLocationRelativeTo(null);

@@ -5,16 +5,16 @@ import javax.swing.Timer;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class GamePanel extends JPanel {
     private final List<Entity> entities;
     private final int rows;
     private final int cols;
     private final int spacing;
+    private final Random random = new Random();
 
-    private int playerPower = 1; // enough to make your first claim
+    private double playerPower = 1.0;
 
     public GamePanel(List<Entity> entities, int rows, int cols, int spacing) {
         this.entities = entities;
@@ -23,9 +23,8 @@ public class GamePanel extends JPanel {
         this.spacing = spacing;
 
         generateTerrainCellular();
+        assignWaterBodies();
 
-        // Claim one random *land* starting tile
-        Random random = new Random();
         Entity start;
         do {
             start = entities.get(random.nextInt(entities.size()));
@@ -44,34 +43,34 @@ public class GamePanel extends JPanel {
             }
         });
 
-        // Power regenerates over time — adjust as needed
-        Timer powerTimer = new Timer(3000, e -> {
-            playerPower++;
+        Timer powerTimer = new Timer(1000, e -> {
+            int ownedTiles = countOwnedTiles();
+            double rate = 0.5 + (0.005 * ownedTiles);
+            playerPower += rate;
             repaint();
         });
         powerTimer.start();
     }
 
-    private void generateTerrainCellular() {
-        Random rand = new Random();
-
-        // Step 1: random noise — ~45% water to start
+    private int countOwnedTiles() {
+        int count = 0;
         for (Entity entity : entities) {
-            entity.setWater(rand.nextDouble() < 0.55);
+            if (entity.isClaimed()) count++;
+        }
+        return count;
+    }
+
+    private void generateTerrainCellular() {
+        for (Entity entity : entities) {
+            entity.setWater(random.nextDouble() < 0.55);
         }
 
-        // Step 2: smooth it — each tile becomes water if most of its
-        // 8 neighbors are water, repeated a few times
         int smoothingPasses = 3;
         for (int pass = 0; pass < smoothingPasses; pass++) {
             boolean[] nextState = new boolean[entities.size()];
-
             for (int i = 0; i < entities.size(); i++) {
-                Entity e = entities.get(i);
-                int waterNeighbors = countWaterNeighbors(e);
-                nextState[i] = waterNeighbors >= 5; // majority of 8
+                nextState[i] = countWaterNeighbors(entities.get(i)) >= 5;
             }
-
             for (int i = 0; i < entities.size(); i++) {
                 entities.get(i).setWater(nextState[i]);
             }
@@ -84,21 +83,115 @@ public class GamePanel extends JPanel {
             for (int dc = -1; dc <= 1; dc++) {
                 if (dr == 0 && dc == 0) continue;
                 Entity neighbor = getEntityAt(entity.row + dr, entity.col + dc);
-                if (neighbor == null || neighbor.isWater()) count++; // edges count as water
+                if (neighbor == null || neighbor.isWater()) count++;
             }
         }
         return count;
     }
 
-    private void tryClaim(Entity entity) {
-        if (entity.isClaimed()) return;
-        if (entity.isWater()) return;
-        if (playerPower < 1) return;
-        if (!isAdjacentToClaimed(entity)) return;
+    private void assignWaterBodies() {
+        boolean[] visited = new boolean[entities.size()];
+        int nextId = 0;
 
-        entity.claim();
-        playerPower--;
-        repaint();
+        for (int i = 0; i < entities.size(); i++) {
+            Entity e = entities.get(i);
+            if (e.isWater() && !visited[i]) {
+                floodFillWater(e, nextId, visited);
+                nextId++;
+            }
+        }
+    }
+
+    private void floodFillWater(Entity start, int id, boolean[] visited) {
+        Deque<Entity> queue = new ArrayDeque<>();
+        queue.add(start);
+        visited[indexOf(start)] = true;
+
+        int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        while (!queue.isEmpty()) {
+            Entity cur = queue.poll();
+            cur.setWaterBodyId(id);
+
+            for (int[] o : offsets) {
+                Entity n = getEntityAt(cur.row + o[0], cur.col + o[1]);
+                if (n != null && n.isWater() && !visited[indexOf(n)]) {
+                    visited[indexOf(n)] = true;
+                    queue.add(n);
+                }
+            }
+        }
+    }
+
+    private int indexOf(Entity e) {
+        return e.row * cols + e.col;
+    }
+
+    private Set<Integer> getAdjacentWaterBodyIds(Entity entity) {
+        Set<Integer> ids = new HashSet<>();
+        int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] o : offsets) {
+            Entity n = getEntityAt(entity.row + o[0], entity.col + o[1]);
+            if (n != null && n.isWater()) ids.add(n.getWaterBodyId());
+        }
+        return ids;
+    }
+
+    private void tryClaim(Entity entity) {
+        if (entity.isClaimed() || entity.isWater() || entity.isPending()) return;
+        if (playerPower < 1.0) return;
+
+        if (isAdjacentToClaimed(entity)) {
+            entity.claim();
+            playerPower -= 1.0;
+            repaint();
+            return;
+        }
+
+        Entity boatSource = findBoatSource(entity);
+        if (boatSource != null) {
+            playerPower -= 1.0;
+            entity.setPending(true);
+
+            double distance = Math.hypot(entity.row - boatSource.row, entity.col - boatSource.col);
+            int delayMs = (int) (distance * 250);
+
+            double stormChance = Math.min(0.6, distance * 0.05);
+            boolean sunk = random.nextDouble() < stormChance;
+
+            Timer captureTimer = new Timer(delayMs, e -> {
+                entity.setPending(false);
+                if (!sunk) {
+                    entity.claim();
+                }
+                repaint();
+            });
+            captureTimer.setRepeats(false);
+            captureTimer.start();
+            repaint();
+        }
+    }
+
+    private Entity findBoatSource(Entity target) {
+        Set<Integer> targetBodies = getAdjacentWaterBodyIds(target);
+        if (targetBodies.isEmpty()) return null;
+
+        Entity closest = null;
+        double closestDist = Double.MAX_VALUE;
+
+        for (Entity candidate : entities) {
+            if (!candidate.isClaimed()) continue;
+
+            Set<Integer> candidateBodies = getAdjacentWaterBodyIds(candidate);
+            candidateBodies.retainAll(targetBodies);
+            if (candidateBodies.isEmpty()) continue;
+
+            double dist = Math.hypot(target.row - candidate.row, target.col - candidate.col);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = candidate;
+            }
+        }
+        return closest;
     }
 
     private boolean isAdjacentToClaimed(Entity entity) {
@@ -127,7 +220,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    public int getPlayerPower() {
+    public double getPlayerPower() {
         return playerPower;
     }
 
