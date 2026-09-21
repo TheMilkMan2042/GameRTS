@@ -22,9 +22,15 @@ public class GamePanel extends JPanel {
         this.cols = cols;
         this.spacing = spacing;
 
-        // Claim one random starting tile
+        generateTerrainCellular();
+
+        // Claim one random *land* starting tile
         Random random = new Random();
-        entities.get(random.nextInt(entities.size())).claim();
+        Entity start;
+        do {
+            start = entities.get(random.nextInt(entities.size()));
+        } while (start.isWater());
+        start.claim();
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -46,8 +52,47 @@ public class GamePanel extends JPanel {
         powerTimer.start();
     }
 
+    private void generateTerrainCellular() {
+        Random rand = new Random();
+
+        // Step 1: random noise — ~45% water to start
+        for (Entity entity : entities) {
+            entity.setWater(rand.nextDouble() < 0.55);
+        }
+
+        // Step 2: smooth it — each tile becomes water if most of its
+        // 8 neighbors are water, repeated a few times
+        int smoothingPasses = 3;
+        for (int pass = 0; pass < smoothingPasses; pass++) {
+            boolean[] nextState = new boolean[entities.size()];
+
+            for (int i = 0; i < entities.size(); i++) {
+                Entity e = entities.get(i);
+                int waterNeighbors = countWaterNeighbors(e);
+                nextState[i] = waterNeighbors >= 5; // majority of 8
+            }
+
+            for (int i = 0; i < entities.size(); i++) {
+                entities.get(i).setWater(nextState[i]);
+            }
+        }
+    }
+
+    private int countWaterNeighbors(Entity entity) {
+        int count = 0;
+        for (int dr = -1; dr <= 1; dr++) {
+            for (int dc = -1; dc <= 1; dc++) {
+                if (dr == 0 && dc == 0) continue;
+                Entity neighbor = getEntityAt(entity.row + dr, entity.col + dc);
+                if (neighbor == null || neighbor.isWater()) count++; // edges count as water
+            }
+        }
+        return count;
+    }
+
     private void tryClaim(Entity entity) {
         if (entity.isClaimed()) return;
+        if (entity.isWater()) return;
         if (playerPower < 1) return;
         if (!isAdjacentToClaimed(entity)) return;
 

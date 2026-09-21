@@ -7,28 +7,22 @@ import java.awt.Rectangle;
 public class Entity {
     int x, y, size;
     int row, col;
-    private EntityType type;
+    private boolean water;
+    private boolean claimed;
 
-    public enum EntityType {
-        NEUTRAL(Color.WHITE),
-        PLAYER(Color.BLUE);
-
-        final Color color;
-
-        EntityType(Color color) {
-            this.color = color;
-        }
-    }
+    private static final Color LAND_COLOR = new Color(150, 200, 120);
+    private static final Color WATER_COLOR = new Color(70, 130, 220);
+    private static final Color CLAIMED_COLOR = new Color(240, 200, 60);
 
     public Entity(int row, int col, int size) {
         this.row = row;
         this.col = col;
         this.size = size;
-        this.type = EntityType.NEUTRAL;
     }
 
     public void draw(Graphics g) {
-        g.setColor(type.color);
+        Color fill = claimed ? CLAIMED_COLOR : (water ? WATER_COLOR : LAND_COLOR);
+        g.setColor(fill);
         g.fillRect(x, y, size, size);
 
         g.setColor(Color.BLACK);
@@ -39,11 +33,9 @@ public class Entity {
         return new Rectangle(x, y, size, size).contains(px, py);
     }
 
-    public boolean isClaimed() {
-        return type == EntityType.PLAYER;
-    }
+    public boolean isWater() { return water; }
+    public void setWater(boolean water) { this.water = water; }
 
-    public void claim() {
-        type = EntityType.PLAYER;
-    }
+    public boolean isClaimed() { return claimed; }
+    public void claim() { claimed = true; }
 }
