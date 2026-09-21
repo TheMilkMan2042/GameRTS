@@ -6,12 +6,12 @@ import java.awt.Rectangle;
 
 public class Entity {
     int x, y, size;
+    int row, col;
     private EntityType type;
 
     public enum EntityType {
-        NEUTRAL(Color.GRAY),
-        FRIENDLY(Color.BLUE),
-        ENEMY(Color.RED);
+        NEUTRAL(Color.WHITE),
+        PLAYER(Color.BLUE);
 
         final Color color;
 
@@ -20,9 +20,9 @@ public class Entity {
         }
     }
 
-    public Entity(int x, int y, int size) {
-        this.x = x;
-        this.y = y;
+    public Entity(int row, int col, int size) {
+        this.row = row;
+        this.col = col;
         this.size = size;
         this.type = EntityType.NEUTRAL;
     }
@@ -38,9 +38,12 @@ public class Entity {
     public boolean contains(int px, int py) {
         return new Rectangle(x, y, size, size).contains(px, py);
     }
-    public void cycleType() {
-        EntityType[] values = EntityType.values();
-        int nextIndex = (type.ordinal() + 1) % values.length;
-        type = values[nextIndex];
+
+    public boolean isClaimed() {
+        return type == EntityType.PLAYER;
+    }
+
+    public void claim() {
+        type = EntityType.PLAYER;
     }
 }
