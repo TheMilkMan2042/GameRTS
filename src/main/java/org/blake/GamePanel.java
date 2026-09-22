@@ -43,7 +43,7 @@ public class GamePanel extends JPanel {
             }
         });
 
-        Timer powerTimer = new Timer(1000, e -> {
+        Timer powerTimer = new Timer(2500, e -> {
             int ownedTiles = countOwnedTiles();
             double rate = 0.5 + (0.025 * ownedTiles);
             playerPower += rate;
@@ -136,6 +136,9 @@ public class GamePanel extends JPanel {
         return ids;
     }
 
+    private int activeBoats = 0;
+    private static final int MAX_BOATS = 3;
+
     private void tryClaim(Entity entity) {
         if (entity.isClaimed() || entity.isWater() || entity.isPending()) return;
         if (playerPower < 1.0) return;
@@ -147,15 +150,17 @@ public class GamePanel extends JPanel {
             return;
         }
 
+        if (activeBoats >= MAX_BOATS) return;
+
         Entity boatSource = findBoatSource(entity);
         if (boatSource != null) {
             playerPower -= 1.0;
             entity.setPending(true);
 
             double distance = Math.hypot(entity.row - boatSource.row, entity.col - boatSource.col);
-            int delayMs = (int) (distance * 250);
+            int delayMs = (int) (distance * 1000);
 
-            double stormChance = Math.min(0.6, distance * 0.05);
+            double stormChance = Math.min(0.6, (Math.pow (1.25, distance)));
             boolean sunk = random.nextDouble() < stormChance;
 
             Timer captureTimer = new Timer(delayMs, e -> {
