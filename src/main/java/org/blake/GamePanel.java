@@ -45,7 +45,7 @@ public class GamePanel extends JPanel {
 
         Timer powerTimer = new Timer(1000, e -> {
             int ownedTiles = countOwnedTiles();
-            double rate = 0.5 + (0.005 * ownedTiles);
+            double rate = 0.5 + (0.025 * ownedTiles);
             playerPower += rate;
             repaint();
         });
