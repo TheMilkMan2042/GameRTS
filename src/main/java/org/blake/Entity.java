@@ -33,7 +33,7 @@ public class Entity {
         g.setColor(fill);
         g.fillRect(x, y, size, size);
 
-        g.setColor(Color.BLACK);
+        g.setColor(Color.DARK_GRAY);
         g.drawRect(x, y, size, size);
     }
 

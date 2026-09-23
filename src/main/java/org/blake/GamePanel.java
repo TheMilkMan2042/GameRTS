@@ -15,6 +15,8 @@ public class GamePanel extends JPanel {
     private final Random random = new Random();
 
     private double playerPower = 1.0;
+    private int activeBoats = 0;
+    private static final int MS_PER_DISTANCE = 250;
 
     public GamePanel(List<Entity> entities, int rows, int cols, int spacing) {
         this.entities = entities;
@@ -43,9 +45,9 @@ public class GamePanel extends JPanel {
             }
         });
 
-        Timer powerTimer = new Timer(2500, e -> {
+        Timer powerTimer = new Timer(1000, e -> {
             int ownedTiles = countOwnedTiles();
-            double rate = 0.5 + (0.025 * ownedTiles);
+            double rate = 0.5 + (0.05 * ownedTiles);
             playerPower += rate;
             repaint();
         });
@@ -136,35 +138,105 @@ public class GamePanel extends JPanel {
         return ids;
     }
 
-    private int activeBoats = 0;
-    private static final int MAX_BOATS = 3;
+    // Finds the specific claimed neighbor touching this tile (used to determine chain direction)
+    private Entity getAdjacentClaimedTile(Entity entity) {
+        int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] o : offsets) {
+            Entity n = getEntityAt(entity.row + o[0], entity.col + o[1]);
+            if (n != null && n.isClaimed()) return n;
+        }
+        return null;
+    }
+
+    private int getTerritorySideLength() {
+        int owned = countOwnedTiles();
+        int side = (int) Math.sqrt(owned) / 2;
+        return Math.max(0, Math.min(2, side));
+    }
+
+    // Claims tiles in a straight line starting at 'target', extending away from 'source',
+    // until roughly half of current power is spent or an invalid tile is hit.
+    private void claimChain(Entity source, Entity target) {
+        int dRow = Integer.signum(target.row - source.row);
+        int dCol = Integer.signum(target.col - source.col);
+
+        int perpRow = -dCol;
+        int perpCol = dRow;
+
+        int totalBudget = (int) (playerPower / 2.0);
+        if (totalBudget < 1) return; // not enough power to expand at all — do nothing
+
+        int numSideLines = getTerritorySideLength();
+        int totalLines = (numSideLines * 2) + 1;
+        int perLineBudget = Math.max(1, totalBudget / totalLines);
+        int remainder = totalBudget - (perLineBudget * totalLines);
+
+        List<Integer> offsets = new ArrayList<>();
+        offsets.add(0);
+        for (int i = 1; i <= numSideLines; i++) {
+            offsets.add(i);
+            offsets.add(-i);
+        }
+
+        boolean first = true;
+        for (int offset : offsets) {
+            if (playerPower < 1.0) break;
+
+            int startRow = target.row + (perpRow * offset);
+            int startCol = target.col + (perpCol * offset);
+
+            int lineBudget = perLineBudget;
+            if (first) {
+                lineBudget += remainder;
+                first = false;
+            }
+
+            int row = startRow;
+            int col = startCol;
+
+            while (lineBudget > 0 && playerPower >= 1.0) {
+                Entity current = getEntityAt(row, col);
+                if (current == null || current.isWater() || current.isClaimed() || current.isPending()) break;
+
+                current.claim();
+                playerPower -= 1.0;
+                lineBudget--;
+
+                row += dRow;
+                col += dCol;
+            }
+        }
+
+        repaint();
+    }
 
     private void tryClaim(Entity entity) {
         if (entity.isClaimed() || entity.isWater() || entity.isPending()) return;
         if (playerPower < 1.0) return;
 
-        if (isAdjacentToClaimed(entity)) {
-            entity.claim();
-            playerPower -= 1.0;
-            repaint();
+        Entity landSource = getAdjacentClaimedTile(entity);
+        if (landSource != null) {
+            claimChain(landSource, entity);
             return;
         }
 
-        if (activeBoats >= MAX_BOATS) return;
+        if (activeBoats >= getMaxBoats()) return;
 
         Entity boatSource = findBoatSource(entity);
         if (boatSource != null) {
             playerPower -= 1.0;
+            activeBoats++;
             entity.setPending(true);
 
             double distance = Math.hypot(entity.row - boatSource.row, entity.col - boatSource.col);
-            int delayMs = (int) (distance * 1000);
+            int delayMs = (int) (distance * MS_PER_DISTANCE);
 
-            double stormChance = Math.min(0.6, (Math.pow (1.25, distance)));
+            double stormChance = Math.min(0.6, distance * 0.05);
             boolean sunk = random.nextDouble() < stormChance;
 
             Timer captureTimer = new Timer(delayMs, e -> {
                 entity.setPending(false);
+                activeBoats--;
                 if (!sunk) {
                     entity.claim();
                 }
@@ -174,6 +246,10 @@ public class GamePanel extends JPanel {
             captureTimer.start();
             repaint();
         }
+    }
+
+    private int getMaxBoats() {
+        return (int) (0.05 * playerPower) + 1;
     }
 
     private Entity findBoatSource(Entity target) {
@@ -199,15 +275,6 @@ public class GamePanel extends JPanel {
         return closest;
     }
 
-    private boolean isAdjacentToClaimed(Entity entity) {
-        int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] offset : offsets) {
-            Entity neighbor = getEntityAt(entity.row + offset[0], entity.col + offset[1]);
-            if (neighbor != null && neighbor.isClaimed()) return true;
-        }
-        return false;
-    }
-
     private Entity getEntityAt(int row, int col) {
         if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
         return entities.get(row * cols + col);
@@ -227,6 +294,14 @@ public class GamePanel extends JPanel {
 
     public double getPlayerPower() {
         return playerPower;
+    }
+
+    public int getActiveBoats() {
+        return activeBoats;
+    }
+
+    public int getMaxBoatsPublic() {
+        return getMaxBoats();
     }
 
     @Override
