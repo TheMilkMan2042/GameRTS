@@ -47,8 +47,9 @@ public class GamePanel extends JPanel {
 
         Timer powerTimer = new Timer(1000, e -> {
             int ownedTiles = countOwnedTiles();
+            double maxPlayerPower = Math.pow(ownedTiles, 1.1);
             double rate = 0.5 + (0.05 * ownedTiles);
-            playerPower += rate;
+            playerPower = Math.min(playerPower + rate, maxPlayerPower);
             repaint();
         });
         powerTimer.start();
@@ -83,7 +84,7 @@ public class GamePanel extends JPanel {
 
     private void generateTerrainCellular() {
         for (Entity entity : entities) {
-            entity.setWater(random.nextDouble() < 0.55);
+            entity.setWater(random.nextDouble() < 0.575);
         }
 
         int smoothingPasses = 6;
