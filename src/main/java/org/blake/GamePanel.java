@@ -242,8 +242,9 @@ public class GamePanel extends JPanel {
         if (playerPower < 1.0) return;
 
         if (isLandReachable(entity, MAX_EXPANSION_RANGE)) {
-            expandToward(entity);
-            return;
+            int claimedCount = expandToward(entity);
+            if (claimedCount > 0) return; // land push actually reached it — done
+            // otherwise fall through and try a boat instead
         }
 
         if (activeBoats >= getMaxBoats()) return;
