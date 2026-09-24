@@ -18,6 +18,10 @@ public class GamePanel extends JPanel {
     private int activeBoats = 0;
     private static final int MS_PER_DISTANCE = 250;
 
+    private static final int MAX_FRONTIER_CANDIDATES = 200;
+    private static final int MAX_CLAIMS_PER_CLICK = 40;
+    private static final int MAX_EXPANSION_RANGE = 20;
+
     public GamePanel(List<Entity> entities, int rows, int cols, int spacing) {
         this.entities = entities;
         this.rows = rows;
@@ -27,11 +31,7 @@ public class GamePanel extends JPanel {
         generateTerrainCellular();
         assignWaterBodies();
 
-        Entity start;
-        do {
-            start = entities.get(random.nextInt(entities.size()));
-        } while (start.isWater());
-        start.claim();
+        claimStartingCircle();
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -60,6 +60,25 @@ public class GamePanel extends JPanel {
             if (entity.isClaimed()) count++;
         }
         return count;
+    }
+
+    private void claimStartingCircle() {
+        int totalTiles = rows * cols;
+        double targetArea = totalTiles * 0.0005; // 0.05% of the map
+        double radius = Math.sqrt(targetArea / Math.PI);
+
+        Entity center;
+        do {
+            center = entities.get(random.nextInt(entities.size()));
+        } while (center.isWater());
+
+        for (Entity e : entities) {
+            if (e.isWater()) continue;
+            double dist = Math.hypot(e.row - center.row, e.col - center.col);
+            if (dist <= radius) {
+                e.claim();
+            }
+        }
     }
 
     private void generateTerrainCellular() {
@@ -138,7 +157,6 @@ public class GamePanel extends JPanel {
         return ids;
     }
 
-    // Finds the specific claimed neighbor touching this tile (used to determine chain direction)
     private Entity getAdjacentClaimedTile(Entity entity) {
         int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
         for (int[] o : offsets) {
@@ -148,75 +166,83 @@ public class GamePanel extends JPanel {
         return null;
     }
 
-    private int getTerritorySideLength() {
-        int owned = countOwnedTiles();
-        int side = (int) Math.sqrt(owned) / 2;
-        return Math.max(0, Math.min(2, side));
-    }
+    private boolean isLandReachable(Entity target, int maxRange) {
+        boolean[] visited = new boolean[entities.size()];
+        Deque<int[]> queue = new ArrayDeque<>(); // {entityIndex, depth}
 
-    // Claims tiles in a straight line starting at 'target', extending away from 'source',
-    // until roughly half of current power is spent or an invalid tile is hit.
-    private void claimChain(Entity source, Entity target) {
-        int dRow = Integer.signum(target.row - source.row);
-        int dCol = Integer.signum(target.col - source.col);
-
-        int perpRow = -dCol;
-        int perpCol = dRow;
-
-        int totalBudget = (int) (playerPower / 2.0);
-        if (totalBudget < 1) return; // not enough power to expand at all — do nothing
-
-        int numSideLines = getTerritorySideLength();
-        int totalLines = (numSideLines * 2) + 1;
-        int perLineBudget = Math.max(1, totalBudget / totalLines);
-        int remainder = totalBudget - (perLineBudget * totalLines);
-
-        List<Integer> offsets = new ArrayList<>();
-        offsets.add(0);
-        for (int i = 1; i <= numSideLines; i++) {
-            offsets.add(i);
-            offsets.add(-i);
+        for (Entity e : entities) {
+            if (e.isClaimed()) {
+                int idx = indexOf(e);
+                visited[idx] = true;
+                queue.add(new int[]{idx, 0});
+            }
         }
 
-        boolean first = true;
-        for (int offset : offsets) {
-            if (playerPower < 1.0) break;
+        int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        while (!queue.isEmpty()) {
+            int[] cur = queue.poll();
+            Entity curEntity = entities.get(cur[0]);
+            int depth = cur[1];
 
-            int startRow = target.row + (perpRow * offset);
-            int startCol = target.col + (perpCol * offset);
+            if (curEntity == target) return true;
+            if (depth >= maxRange) continue;
 
-            int lineBudget = perLineBudget;
-            if (first) {
-                lineBudget += remainder;
-                first = false;
+            for (int[] o : offsets) {
+                Entity n = getEntityAt(curEntity.row + o[0], curEntity.col + o[1]);
+                if (n != null && !n.isWater()) {
+                    int nIdx = indexOf(n);
+                    if (!visited[nIdx]) {
+                        visited[nIdx] = true;
+                        queue.add(new int[]{nIdx, depth + 1});
+                    }
+                }
             }
+        }
+        return false;
+    }
 
-            int row = startRow;
-            int col = startCol;
+    private int expandToward(Entity target) {
+        int budget = (int) (playerPower / 2.0);
+        if (budget < 1) return 0;
 
-            while (lineBudget > 0 && playerPower >= 1.0) {
-                Entity current = getEntityAt(row, col);
-                if (current == null || current.isWater() || current.isClaimed() || current.isPending()) break;
+        budget = Math.min(budget, MAX_CLAIMS_PER_CLICK);
 
-                current.claim();
-                playerPower -= 1.0;
-                lineBudget--;
-
-                row += dRow;
-                col += dCol;
+        List<Entity> frontier = new ArrayList<>();
+        for (Entity e : entities) {
+            if (e.isClaimed() || e.isWater() || e.isPending()) continue;
+            if (getAdjacentClaimedTile(e) != null) {
+                frontier.add(e);
             }
+        }
+
+        frontier.sort(Comparator.comparingDouble(e ->
+                Math.hypot(e.row - target.row, e.col - target.col)
+        ));
+
+        if (frontier.size() > MAX_FRONTIER_CANDIDATES) {
+            frontier = frontier.subList(0, MAX_FRONTIER_CANDIDATES);
+        }
+
+        int claimed = 0;
+        for (Entity e : frontier) {
+            if (claimed >= budget || playerPower < 1.0) break;
+            if (getAdjacentClaimedTile(e) == null) continue;
+
+            e.claim();
+            playerPower -= 1.0;
+            claimed++;
         }
 
         repaint();
+        return claimed;
     }
 
     private void tryClaim(Entity entity) {
         if (entity.isClaimed() || entity.isWater() || entity.isPending()) return;
         if (playerPower < 1.0) return;
 
-        Entity landSource = getAdjacentClaimedTile(entity);
-        if (landSource != null) {
-            claimChain(landSource, entity);
+        if (isLandReachable(entity, MAX_EXPANSION_RANGE)) {
+            expandToward(entity);
             return;
         }
 
