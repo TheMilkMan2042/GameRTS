@@ -21,10 +21,10 @@ public class Main {
             JLabel powerLabel = new JLabel("Power: 1.00", SwingConstants.CENTER);
             window.add(powerLabel, BorderLayout.NORTH);
 
-            int rows = 77;
-            int cols = 152;
-            int entitySize = 10;
-            int spacing = 10;
+            int rows = 154;
+            int cols = 306;
+            int entitySize = 5;
+            int spacing = 5;
 
             List<Entity> entities = new ArrayList<>();
             for (int i = 0; i < rows * cols; i++) {

@@ -86,7 +86,7 @@ public class GamePanel extends JPanel {
             entity.setWater(random.nextDouble() < 0.55);
         }
 
-        int smoothingPasses = 3;
+        int smoothingPasses = 6;
         for (int pass = 0; pass < smoothingPasses; pass++) {
             boolean[] nextState = new boolean[entities.size()];
             for (int i = 0; i < entities.size(); i++) {
