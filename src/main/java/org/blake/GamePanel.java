@@ -8,19 +8,21 @@ import java.awt.event.MouseEvent;
 import java.util.*;
 
 public class GamePanel extends JPanel {
-    private final List<Entity> entities;
-    private final int rows;
-    private final int cols;
-    private final int spacing;
-    private final Random random = new Random();
+    public final List<Entity> entities;
+    public final int rows;
+    public final int cols;
+    public final int spacing;
+    public final Random random = new Random();
 
-    private double playerPower = 1.0;
-    private int activeBoats = 0;
-    private static final int MS_PER_DISTANCE = 250;
+//    Your starting power, B O A T stuff, classes for stuff
 
-    private static final int MAX_FRONTIER_CANDIDATES = 200;
-    private static final int MAX_CLAIMS_PER_CLICK = 40;
-    private static final int MAX_EXPANSION_RANGE = 20;
+    public double playerPower = 1.0;
+    public int activeBoats = 0;
+    public static final int MS_PER_DISTANCE = 250;
+
+    public static final int MAX_FRONTIER_CANDIDATES = 200;
+    public static final int MAX_CLAIMS_PER_CLICK = 100;
+    public static final int MAX_EXPANSION_RANGE = 100;
 
     public GamePanel(List<Entity> entities, int rows, int cols, int spacing) {
         this.entities = entities;
@@ -47,15 +49,17 @@ public class GamePanel extends JPanel {
 
         Timer powerTimer = new Timer(1000, e -> {
             int ownedTiles = countOwnedTiles();
-            double maxPlayerPower = Math.pow(ownedTiles, 1.1);
-            double rate = 0.5 + (0.05 * ownedTiles);
+            double maxPlayerPower = (ownedTiles / 2);
+            double rate = 0.25 + (0.05 * ownedTiles);
             playerPower = Math.min(playerPower + rate, maxPlayerPower);
             repaint();
         });
         powerTimer.start();
     }
 
-    private int countOwnedTiles() {
+//    How many tiles do you own
+
+    public int countOwnedTiles() {
         int count = 0;
         for (Entity entity : entities) {
             if (entity.isClaimed()) count++;
@@ -63,7 +67,9 @@ public class GamePanel extends JPanel {
         return count;
     }
 
-    private void claimStartingCircle() {
+//    Makes a random place for a starting circle
+
+    public void claimStartingCircle() {
         int totalTiles = rows * cols;
         double targetArea = totalTiles * 0.0005; // 0.05% of the map
         double radius = Math.sqrt(targetArea / Math.PI);
@@ -82,7 +88,9 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private void generateTerrainCellular() {
+//*    Terrain gen (makes random tiles land or water based on entity.setWater, smooths it together based on how many waters are close to it
+
+    public void generateTerrainCellular() {
         for (Entity entity : entities) {
             entity.setWater(random.nextDouble() < 0.575);
         }
@@ -99,7 +107,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private int countWaterNeighbors(Entity entity) {
+    public int countWaterNeighbors(Entity entity) {
         int count = 0;
         for (int dr = -1; dr <= 1; dr++) {
             for (int dc = -1; dc <= 1; dc++) {
@@ -111,7 +119,7 @@ public class GamePanel extends JPanel {
         return count;
     }
 
-    private void assignWaterBodies() {
+    public void assignWaterBodies() {
         boolean[] visited = new boolean[entities.size()];
         int nextId = 0;
 
@@ -124,7 +132,7 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private void floodFillWater(Entity start, int id, boolean[] visited) {
+    public void floodFillWater(Entity start, int id, boolean[] visited) {
         Deque<Entity> queue = new ArrayDeque<>();
         queue.add(start);
         visited[indexOf(start)] = true;
@@ -144,11 +152,13 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private int indexOf(Entity e) {
+    // Gets the row and col of adjacent entity, but for water
+
+    public int indexOf(Entity e) {
         return e.row * cols + e.col;
     }
 
-    private Set<Integer> getAdjacentWaterBodyIds(Entity entity) {
+    public Set<Integer> getAdjacentWaterBodyIds(Entity entity) {
         Set<Integer> ids = new HashSet<>();
         int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
         for (int[] o : offsets) {
@@ -158,7 +168,9 @@ public class GamePanel extends JPanel {
         return ids;
     }
 
-    private Entity getAdjacentClaimedTile(Entity entity) {
+// Gets the row and col of adjacent entity
+
+    public Entity getAdjacentClaimedTile(Entity entity) {
         int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
         for (int[] o : offsets) {
             Entity n = getEntityAt(entity.row + o[0], entity.col + o[1]);
@@ -167,7 +179,7 @@ public class GamePanel extends JPanel {
         return null;
     }
 
-    private boolean isLandReachable(Entity target, int maxRange) {
+    public boolean isLandReachable(Entity target, int maxRange) {
         boolean[] visited = new boolean[entities.size()];
         Deque<int[]> queue = new ArrayDeque<>(); // {entityIndex, depth}
 
@@ -202,7 +214,9 @@ public class GamePanel extends JPanel {
         return false;
     }
 
-    private int expandToward(Entity target) {
+//Makes whole border expand towards Tryclaim (ed) tile
+
+    public int expandToward(Entity target) {
         int budget = (int) (playerPower / 2.0);
         if (budget < 1) return 0;
 
@@ -233,12 +247,11 @@ public class GamePanel extends JPanel {
             playerPower -= 1.0;
             claimed++;
         }
-
         repaint();
         return claimed;
     }
-
-    private void tryClaim(Entity entity) {
+    // Checks if the tile/area you want to claim is valid on click
+    public void tryClaim(Entity entity) {
         if (entity.isClaimed() || entity.isWater() || entity.isPending()) return;
         if (playerPower < 1.0) return;
 
@@ -247,6 +260,8 @@ public class GamePanel extends JPanel {
             if (claimedCount > 0) return; // land push actually reached it — done
             // otherwise fall through and try a boat instead
         }
+
+        // B O A T Math
 
         if (activeBoats >= getMaxBoats()) return;
 
@@ -259,7 +274,7 @@ public class GamePanel extends JPanel {
             double distance = Math.hypot(entity.row - boatSource.row, entity.col - boatSource.col);
             int delayMs = (int) (distance * MS_PER_DISTANCE);
 
-            double stormChance = Math.min(0.6, distance * 0.05);
+            double stormChance = Math.min(0.6, distance * 0.025);
             boolean sunk = random.nextDouble() < stormChance;
 
             Timer captureTimer = new Timer(delayMs, e -> {
@@ -276,11 +291,13 @@ public class GamePanel extends JPanel {
         }
     }
 
-    private int getMaxBoats() {
+    // B O A T Math
+
+    public int getMaxBoats() {
         return (int) (0.05 * playerPower) + 1;
     }
 
-    private Entity findBoatSource(Entity target) {
+    public Entity findBoatSource(Entity target) {
         Set<Integer> targetBodies = getAdjacentWaterBodyIds(target);
         if (targetBodies.isEmpty()) return null;
 
@@ -303,12 +320,12 @@ public class GamePanel extends JPanel {
         return closest;
     }
 
-    private Entity getEntityAt(int row, int col) {
+    public Entity getEntityAt(int row, int col) {
         if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
         return entities.get(row * cols + col);
     }
 
-    private void layoutEntities() {
+    public void layoutEntities() {
         int gridWidth = cols * spacing;
         int gridHeight = rows * spacing;
         int startX = (getWidth() - gridWidth) / 2;
@@ -322,14 +339,6 @@ public class GamePanel extends JPanel {
 
     public double getPlayerPower() {
         return playerPower;
-    }
-
-    public int getActiveBoats() {
-        return activeBoats;
-    }
-
-    public int getMaxBoatsPublic() {
-        return getMaxBoats();
     }
 
     @Override

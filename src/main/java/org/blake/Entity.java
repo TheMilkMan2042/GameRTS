@@ -7,15 +7,15 @@ import java.awt.Rectangle;
 public class Entity {
     int x, y, size;
     int row, col;
-    private boolean water;
-    private boolean claimed;
-    private boolean pending;
-    private int waterBodyId = -1;
+    public boolean water;
+    public boolean claimed;
+    public boolean pending;
+    public int waterBodyId = -1;
 
-    private static final Color LAND_COLOR = new Color(150, 200, 120);
-    private static final Color WATER_COLOR = new Color(70, 130, 220);
-    private static final Color CLAIMED_COLOR = new Color(240, 200, 60);
-    private static final Color PENDING_COLOR = new Color(240, 220, 150);
+    public static final Color LAND_COLOR = new Color(150, 200, 120);
+    public static final Color WATER_COLOR = new Color(70, 130, 220);
+    public static final Color CLAIMED_COLOR = new Color(240, 200, 60);
+    public static final Color PENDING_COLOR = new Color(240, 220, 150);
 
     public Entity(int row, int col, int size) {
         this.row = row;
