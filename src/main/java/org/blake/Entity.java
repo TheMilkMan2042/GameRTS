@@ -22,6 +22,9 @@ public class Entity {
         this.col = col;
         this.size = size;
     }
+    public String getId() {
+        return row + "," + col;
+    }
 
     public void draw(Graphics g) {
         Color fill;
