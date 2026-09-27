@@ -9,11 +9,14 @@ import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.awt.Color;
+import java.util.Random;
 
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame window = new JFrame("RTS Game");
+            long seed = new Random().nextLong();
+
+            JFrame window = new JFrame("RTS Game — Seed: " + seed);
 
             window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             window.setSize(800, 600);
@@ -33,7 +36,7 @@ public class Main {
                 entities.add(new Entity(row, col, entitySize));
             }
 
-            GamePanel panel = new GamePanel(entities, rows, cols, spacing);
+            GamePanel panel = new GamePanel(entities, rows, cols, spacing, seed);
             window.add(panel, BorderLayout.CENTER);
 
             Timer labelTimer = new Timer(200, e -> powerLabel.setText(String.format("Power: %.2f", panel.getPlayerPower())));
