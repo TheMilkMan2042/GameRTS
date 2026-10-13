@@ -24,8 +24,8 @@ public class Main {
             JLabel powerLabel = new JLabel("Power: 1.00", SwingConstants.CENTER);
             window.add(powerLabel, BorderLayout.NORTH);
 
-            int rows = 154;
-            int cols = 306;
+            int rows = 121;
+            int cols = 253;
             int entitySize = 5;
             int spacing = 5;
 
