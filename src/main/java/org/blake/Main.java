@@ -8,8 +8,8 @@ import javax.swing.SwingUtilities;
 import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
-import java.awt.Color;
 import java.util.Random;
+import java.awt.Color;
 
 public class Main {
     public static void main(String[] args) {
@@ -24,10 +24,11 @@ public class Main {
             JLabel powerLabel = new JLabel("Power: 1.00", SwingConstants.CENTER);
             window.add(powerLabel, BorderLayout.NORTH);
 
-            int rows = 121;
-            int cols = 253;
+            int rows = 154;
+            int cols = 306;
             int entitySize = 5;
             int spacing = 5;
+            int botCount = 3;
 
             List<Entity> entities = new ArrayList<>();
             for (int i = 0; i < rows * cols; i++) {
@@ -36,7 +37,7 @@ public class Main {
                 entities.add(new Entity(row, col, entitySize));
             }
 
-            GamePanel panel = new GamePanel(entities, rows, cols, spacing, seed);
+            GamePanel panel = new GamePanel(entities, rows, cols, spacing, seed, botCount);
             window.add(panel, BorderLayout.CENTER);
 
             Timer labelTimer = new Timer(200, e -> powerLabel.setText(String.format("Power: %.2f", panel.getPlayerPower())));

@@ -7,28 +7,24 @@ import java.awt.Rectangle;
 public class Entity {
     int x, y, size;
     int row, col;
-    public boolean water;
-    public boolean claimed;
-    public boolean pending;
-    public int waterBodyId = -1;
+    private boolean water;
+    private boolean pending;
+    private int waterBodyId = -1;
+    private Player owner; // null = unclaimed
 
-    public static final Color LAND_COLOR = new Color(150, 200, 120);
-    public static final Color WATER_COLOR = new Color(70, 130, 220);
-    public static final Color CLAIMED_COLOR = new Color(240, 200, 60);
-    public static final Color PENDING_COLOR = new Color(240, 220, 150);
+    private static final Color LAND_COLOR = new Color(150, 200, 120);
+    private static final Color WATER_COLOR = new Color(70, 130, 220);
+    private static final Color PENDING_COLOR = new Color(240, 220, 150);
 
     public Entity(int row, int col, int size) {
         this.row = row;
         this.col = col;
         this.size = size;
     }
-    public String getId() {
-        return row + "," + col;
-    }
 
     public void draw(Graphics g) {
         Color fill;
-        if (claimed) fill = CLAIMED_COLOR;
+        if (owner != null) fill = owner.color;
         else if (pending) fill = PENDING_COLOR;
         else if (water) fill = WATER_COLOR;
         else fill = LAND_COLOR;
@@ -36,7 +32,7 @@ public class Entity {
         g.setColor(fill);
         g.fillRect(x, y, size, size);
 
-        g.setColor(Color.DARK_GRAY);
+        g.setColor(Color.BLACK);
         g.drawRect(x, y, size, size);
     }
 
@@ -44,11 +40,17 @@ public class Entity {
         return new Rectangle(x, y, size, size).contains(px, py);
     }
 
+    public String getId() {
+        return row + "," + col;
+    }
+
     public boolean isWater() { return water; }
     public void setWater(boolean water) { this.water = water; }
 
-    public boolean isClaimed() { return claimed; }
-    public void claim() { claimed = true; }
+    public boolean isClaimed() { return owner != null; }
+    public Player getOwner() { return owner; }
+    // Only GamePanel.claimTile() should call this, so the owner's tile set stays in sync.
+    public void setOwner(Player owner) { this.owner = owner; }
 
     public boolean isPending() { return pending; }
     public void setPending(boolean pending) { this.pending = pending; }
