@@ -16,6 +16,7 @@ public class GamePanel extends JPanel {
     private final int spacing;
     private final long seed;
     private final Random random;
+    private final double maxPower;
 
     private final List<Player> players = new ArrayList<>();
     private final Player human;
@@ -65,6 +66,7 @@ public class GamePanel extends JPanel {
         this.rows = rows;
         this.cols = cols;
         this.spacing = spacing;
+        this.maxPower = (rows * cols) / 10.0;
         this.seed = seed;
         this.random = new Random(seed);
 
@@ -112,7 +114,7 @@ public class GamePanel extends JPanel {
         // Every player's power grows with how much land they own.
         Timer powerTimer = new Timer(1000, e -> {
             for (Player p : players) {
-                p.power += 0.5 + (0.05 * p.tiles.size());
+                p.power = Math.min(maxPower, p.power + 0.5 + (0.05 * p.tiles.size()));
             }
             repaint();
         });
