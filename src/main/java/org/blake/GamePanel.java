@@ -27,6 +27,27 @@ public class GamePanel extends JPanel {
     private static final int MAX_CLAIMS_PER_CLICK = 40;
     private static final int MAX_EXPANSION_RANGE = 20;
 
+    // --- Power rate (power gained per second) ---
+    // Rate = BASE + MAX_BONUS * (1 - e^(-tiles / SCALE)). Each extra tile adds exponentially
+    // less than the last, and the rate can never exceed BASE + MAX_BONUS.
+    private static final double POWER_BASE_RATE = 0.5;
+    // The most extra power/sec territory can ever add. This is the rate cap (minus the base).
+    private static final double POWER_RATE_MAX_BONUS = 30.0;
+    // Derived so the very first tiles still give the original +0.05/sec each.
+    // (Raise the max bonus and this stretches automatically, keeping the early game feel.)
+    private static final double POWER_RATE_SCALE = POWER_RATE_MAX_BONUS / 0.05;
+
+    // Power cost PER TILE to auto-claim a group of land enclosed by one player.
+    // 0 = free. If you set a cost, a group the player can't afford at that moment is
+    // NOT retried later, so free is the less tedious option.
+    private static final double AUTO_FILL_COST = 0.0;
+    // Largest enclosed group (in tiles) that will be auto-claimed. Bigger pockets are left
+    // alone, which also keeps the check cheap. Raise it to capture larger enclosed areas.
+    private static final int MAX_FILL_REGION = 8;
+    // A group that touches water is claimed once this many of its sides border one player's
+    // territory (counted across the whole group). Groups with no water need to be fully enclosed.
+    private static final int MIN_OWNED_SIDES_WITH_WATER = 2;
+
     // Minimum drag distance (in pixels) before a press-release is treated as a
     // directional arrow instead of a simple click.
     private static final int DRAG_THRESHOLD = 15;
@@ -66,7 +87,7 @@ public class GamePanel extends JPanel {
         this.rows = rows;
         this.cols = cols;
         this.spacing = spacing;
-        this.maxPower = (rows * cols) / 10.0;
+        this.maxPower = (rows * cols) / 50.0;
         this.seed = seed;
         this.random = new Random(seed);
 
@@ -111,10 +132,10 @@ public class GamePanel extends JPanel {
             }
         });
 
-        // Every player's power grows with how much land they own.
+        // Every player's power grows with how much land they own (with diminishing returns).
         Timer powerTimer = new Timer(1000, e -> {
             for (Player p : players) {
-                p.power = Math.min(maxPower, p.power + 0.5 + (0.05 * p.tiles.size()));
+                p.power = Math.min(maxPower, p.power + getPowerRate(p));
             }
             repaint();
         });
@@ -129,15 +150,103 @@ public class GamePanel extends JPanel {
         }
     }
 
+    // ---------- Power rate ----------
+
+    // Power per second. Climbs quickly at first, then flattens toward BASE + MAX_BONUS,
+    // so the 1000th tile is worth far less than the 10th.
+    private double getPowerRate(Player p) {
+        double bonus = POWER_RATE_MAX_BONUS * (1.0 - Math.exp(-p.tiles.size() / POWER_RATE_SCALE));
+        return POWER_BASE_RATE + bonus;
+    }
+
     // ---------- Ownership ----------
 
     // The ONE place tile ownership changes, so each player's tile set never drifts out of sync.
     // (Attacks and the cut-off-territory rule can reuse this later to transfer tiles.)
     private void claimTile(Entity e, Player p) {
+        assignOwner(e, p);
+        if (p != null) fillEnclosedRegions(e, p);
+    }
+
+    // Raw ownership change with no side effects (used directly when filling a region,
+    // so filling doesn't re-trigger itself tile by tile).
+    private void assignOwner(Entity e, Player p) {
         Player old = e.getOwner();
         if (old != null) old.tiles.remove(e);
         e.setOwner(p);
         if (p != null) p.tiles.add(e);
+    }
+
+    // After a claim, check each unowned land tile touching it. If that tile belongs to a
+    // group of connected unowned land whose entire border is owned by this one player,
+    // the whole group is claimed. A claim can only complete an enclosure that touches the
+    // newly claimed tile, so only its 4 neighbors need checking.
+    private void fillEnclosedRegions(Entity claimed, Player p) {
+        Set<Entity> checked = new HashSet<>();
+
+        for (int[] o : ORTHO) {
+            Entity start = getEntityAt(claimed.row + o[0], claimed.col + o[1]);
+            if (start == null || start.getOwner() != null || start.isWater()) continue;
+            if (checked.contains(start)) continue;
+
+            List<Entity> region = findEnclosedRegion(start, p, checked);
+            if (region == null) continue;
+
+            double cost = AUTO_FILL_COST * region.size();
+            if (p.power < cost) continue;
+            p.power -= cost;
+
+            for (Entity t : region) {
+                assignOwner(t, p);
+            }
+        }
+    }
+
+    // Flood-fills the unowned land connected to 'start'. Every tile bordering the group must
+    // be either the player's territory or water. Returns the group if:
+    //   - it never touches water (fully enclosed by the player), or
+    //   - it touches water AND at least MIN_OWNED_SIDES_WITH_WATER of its sides border the player.
+    // Returns null if the group touches a map edge, another player's land, a tile with a
+    // boat on the way, or is bigger than MAX_FILL_REGION (which also keeps open continents
+    // from being scanned in full).
+    private List<Entity> findEnclosedRegion(Entity start, Player p, Set<Entity> checked) {
+        List<Entity> region = new ArrayList<>();
+        Deque<Entity> queue = new ArrayDeque<>();
+        queue.add(start);
+        checked.add(start);
+
+        boolean touchesWater = false;
+        int ownedSides = 0;
+
+        while (!queue.isEmpty()) {
+            Entity cur = queue.poll();
+            if (cur.isPending()) return null;
+
+            region.add(cur);
+            if (region.size() > MAX_FILL_REGION) return null;
+
+            for (int[] o : ORTHO) {
+                Entity n = getEntityAt(cur.row + o[0], cur.col + o[1]);
+                if (n == null) return null;
+
+                if (n.isWater()) {
+                    touchesWater = true;
+                    continue;
+                }
+
+                Player owner = n.getOwner();
+                if (owner == null) {
+                    if (checked.add(n)) queue.add(n);
+                } else if (owner != p) {
+                    return null;
+                } else {
+                    ownedSides++;
+                }
+            }
+        }
+
+        if (touchesWater && ownedSides < MIN_OWNED_SIDES_WITH_WATER) return null;
+        return region;
     }
 
     private void placeStartingTerritories() {
@@ -545,7 +654,7 @@ public class GamePanel extends JPanel {
         double distance = Math.hypot(target.row - source.row, target.col - source.col);
         int delayMs = (int) (distance * MS_PER_DISTANCE);
 
-        double stormChance = Math.min(0.6, (distance / (rows * cols)));
+        double stormChance = Math.min(0.6, (distance / 300));
         boolean sunk = random.nextDouble() < stormChance;
 
         Timer captureTimer = new Timer(delayMs, ev -> {
@@ -664,6 +773,11 @@ public class GamePanel extends JPanel {
 
     public double getPlayerPower() {
         return human.power;
+    }
+
+    // Your current power per second (handy for showing in the label while tuning).
+    public double getPlayerPowerRate() {
+        return getPowerRate(human);
     }
 
     public int getActiveBoats() {
