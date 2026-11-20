@@ -14,6 +14,11 @@ public class Player {
 
     double power = 1.0;
     int activeBoats = 0;
+    long spearReadyAt = 0; // timestamp (ms) when the spear can be used again
+
+    public long getSpearCooldownRemainingMs() {
+        return Math.max(0, spearReadyAt - System.currentTimeMillis());
+    }
 
     // Every tile this player owns. Insertion-ordered so seeded runs stay deterministic.
     final Set<Entity> tiles = new LinkedHashSet<>();

@@ -85,6 +85,14 @@ public class GamePanel extends JPanel {
         return seed;
     }
 
+    public double getSpearCooldownSeconds() {
+        return game.human.getSpearCooldownRemainingMs() / 1000.0;
+    }
+
+    public double getOwnedPercent() {
+        return game.getOwnedPercent(game.human);
+    }
+
     public List<Player> getPlayers() {
         return Collections.unmodifiableList(game.players);
     }

@@ -25,6 +25,7 @@ public class Game {
     final BotController bots;
 
     private final double maxPower;
+    private final int landTileCount;
     private final Runnable onChange; // called whenever something changes and the screen needs a repaint
 
     public Game(World world, long seed, int botCount, Runnable onChange) {
@@ -34,6 +35,12 @@ public class Game {
         this.maxPower = (world.rows * world.cols) / MAX_POWER_DIVISOR;
 
         TerrainGenerator.generate(world, random);
+
+        int land = 0;
+        for (Entity e : world.entities) {
+            if (!e.isWater()) land++;
+        }
+        this.landTileCount = land;
 
         players.add(new Player(0, "You", PLAYER_COLORS[0], false));
         for (int i = 1; i <= botCount; i++) {
@@ -107,6 +114,15 @@ public class Game {
     double getPowerRate(Player p) {
         double bonus = POWER_RATE_MAX_BONUS * (1.0 - Math.exp(-p.tiles.size() / POWER_RATE_SCALE));
         return POWER_BASE_RATE + bonus;
+    }
+
+    // ---------- Tiles Owned ----------
+
+    double getOwnedPercent(Player p) {
+        if (landTileCount == 0) {
+            return 0;
+        }
+        return 100.0 * p.tiles.size() / landTileCount;
     }
 
     // ---------- Starting territories ----------

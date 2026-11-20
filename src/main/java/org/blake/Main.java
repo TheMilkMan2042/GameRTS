@@ -9,7 +9,6 @@ import java.awt.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Random;
-import java.awt.Color;
 
 public class Main {
     public static void main(String[] args) {
@@ -40,7 +39,12 @@ public class Main {
             GamePanel panel = new GamePanel(entities, rows, cols, spacing, seed, botCount);
             window.add(panel, BorderLayout.CENTER);
 
-            Timer labelTimer = new Timer(200, e -> powerLabel.setText(String.format("Power: %.2f", panel.getPlayerPower())));
+            Timer labelTimer = new Timer(200, e -> {
+                double cooldown = panel.getSpearCooldownSeconds();
+                String spearText = cooldown > 0 ? String.format("Spear: %.1fs", cooldown) : "Spear: ready";
+                powerLabel.setText(String.format("Power: %.2f  |  %s  |  Owned: %.1f%%",
+                        panel.getPlayerPower(), spearText, panel.getOwnedPercent()));
+            });
             labelTimer.start();
 
             window.setLocationRelativeTo(null);

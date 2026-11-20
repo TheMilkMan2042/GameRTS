@@ -13,12 +13,14 @@ public final class GameSettings {
 
     // --- Land expansion ---
     public static final int MAX_FRONTIER_CANDIDATES = 200;
-    public static final int MAX_CLAIMS_PER_CLICK = 40;
+    public static final int MAX_CLAIMS_PER_CLICK = 75;
     public static final int MAX_EXPANSION_RANGE = 20;
     // Caps how many tiles deep an arrow expansion can reach, regardless of power budget.
     public static final int MAX_ARROW_LENGTH = 15;
     // How many tiles wide the arrow's line is, on EACH side of the center line.
     public static final int ARROW_WIDTH = 1;
+    // How long (in ms) a player must wait between spear (drag arrow) uses.
+    public static final int SPEAR_COOLDOWN_MS = 10000;
 
     // --- Power ---
     public static final int POWER_TICK_MS = 1000;

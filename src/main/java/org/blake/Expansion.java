@@ -139,6 +139,7 @@ public class Expansion {
 
     // Core arrow logic (bots can call this directly with an anchor tile and an angle).
     void expandAlongAngle(Player p, Entity anchor, double baseAngle) {
+        if (p.getSpearCooldownRemainingMs() > 0) return;
         double centerRow = anchor.row;
         double centerCol = anchor.col;
 
@@ -226,6 +227,9 @@ public class Expansion {
             steps++;
         }
 
+        if (claimed > 0) {
+            p.spearReadyAt = System.currentTimeMillis() + SPEAR_COOLDOWN_MS;
+        }
         game.requestRepaint();
     }
 }
