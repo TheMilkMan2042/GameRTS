@@ -24,6 +24,10 @@ public class Game {
     final Boats boats;
     final BotController bots;
 
+    private boolean gameOver = false;
+    private Player winner = null;
+    private Timer powerTimer;
+    private final List<Timer> botTimers = new ArrayList<>();
     private final double maxPower;
     private final int landTileCount;
     private final Runnable onChange; // called whenever something changes and the screen needs a repaint
@@ -61,7 +65,7 @@ public class Game {
 
     // Starts the power timer and one think-timer per bot.
     public void start() {
-        Timer powerTimer = new Timer(POWER_TICK_MS, e -> {
+        powerTimer = new Timer(POWER_TICK_MS, e -> {
             for (Player p : players) {
                 p.power = Math.min(maxPower, p.power + getPowerRate(p));
             }
@@ -75,17 +79,20 @@ public class Game {
             Timer botTimer = new Timer(BOT_THINK_MS, e -> bots.botTurn(p));
             botTimer.setInitialDelay(500 + random.nextInt(BOT_THINK_MS));
             botTimer.start();
+            botTimers.add(botTimer);
         }
     }
 
     // ---------- Input from the human player ----------
 
     public void handleClick(Point point) {
+        if (gameOver) return;
         Entity entity = world.findEntityAtPoint(point);
         if (entity != null) tryClaim(human, entity);
     }
 
     public void handleDrag(Point start, double dx, double dy) {
+        if (gameOver) return;
         expansion.expandInDirection(human, start, dx, dy);
     }
 
@@ -178,8 +185,33 @@ public class Game {
     // The ONE place tile ownership changes, so each player's tile set never drifts out of sync.
     // (Attacks and the cut-off-territory rule can reuse this later to transfer tiles.)
     void claimTile(Entity e, Player p) {
+        if (gameOver && p != null) return; // map is frozen after someone wins
         assignOwner(e, p);
-        if (p != null) fillEnclosedRegions(e, p);
+        if (p != null) {
+            fillEnclosedRegions(e, p);
+            checkWin(p);
+        }
+    }
+
+    //Checks if owned = the amount necessary to win
+
+    private void checkWin(Player p) {
+        if (gameOver) return;
+        if (getOwnedPercent(p) >= WIN_PERCENT) {
+            gameOver = true;
+            winner = p;
+            if (powerTimer != null) powerTimer.stop();
+            for (Timer t : botTimers) t.stop();
+            requestRepaint();
+        }
+    }
+
+    boolean isGameOver() {
+        return gameOver;
+    }
+
+    Player getWinner() {
+        return winner;
     }
 
     // Raw ownership change with no side effects (used directly when filling a region,

@@ -9,9 +9,12 @@ public final class GameSettings {
     // --- Input ---
     // Minimum drag distance (in pixels) before a press-release counts as a directional arrow
     // instead of a simple click.
-    public static final int DRAG_THRESHOLD = 15;
+    public static final int DRAG_THRESHOLD = 25;
 
     // --- Land expansion ---
+
+    // A player wins when they own this percent of all land tiles.
+    public static final double WIN_PERCENT = 80.0;
     public static final int MAX_FRONTIER_CANDIDATES = 200;
     public static final int MAX_CLAIMS_PER_CLICK = 75;
     public static final int MAX_EXPANSION_RANGE = 20;
