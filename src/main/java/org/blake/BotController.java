@@ -3,6 +3,7 @@ package org.blake;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayList;
 
 import static org.blake.GameSettings.*;
 
@@ -22,7 +23,10 @@ public class BotController {
 
         List<Entity> frontier = game.expansion.getFrontier(bot);
 
-        // Out of land to grab (or randomly feeling adventurous): look for a boat target.
+        // Attack a neighbor: always when out of free land, sometimes otherwise.
+        boolean wantAttack = frontier.isEmpty() || game.random.nextDouble() < BOT_ATTACK_CHANCE;
+        if (wantAttack && tryBotAttack(bot)) return;
+
         boolean wantBoat = frontier.isEmpty() || game.random.nextDouble() < BOT_BOAT_CHANCE;
         if (wantBoat && tryBotBoat(bot)) return;
 
@@ -30,6 +34,26 @@ public class BotController {
             Entity target = frontier.get(game.random.nextInt(frontier.size()));
             game.expansion.expandToward(bot, target);
         }
+    }
+
+    // Picks the weakest bordering player (fewest tiles) and pushes into a random border tile of theirs.
+    private boolean tryBotAttack(Player bot) {
+        List<Entity> enemyFrontier = game.expansion.getEnemyFrontier(bot, null);
+        if (enemyFrontier.isEmpty()) return false;
+
+        Player weakest = null;
+        for (Entity e : enemyFrontier) {
+            Player owner = e.getOwner();
+            if (weakest == null || owner.tiles.size() < weakest.tiles.size()) weakest = owner;
+        }
+
+        List<Entity> targets = new ArrayList<>();
+        for (Entity e : enemyFrontier) {
+            if (e.getOwner() == weakest) targets.add(e);
+        }
+
+        Entity target = targets.get(game.random.nextInt(targets.size()));
+        return game.expansion.attackToward(bot, target) > 0;
     }
 
     private boolean tryBotBoat(Player bot) {

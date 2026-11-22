@@ -111,15 +111,26 @@ public class GamePanel extends JPanel {
 
         if (game.isGameOver()) {
             Player winner = game.getWinner();
-            String text = (winner == game.human) ? "YOU WIN!" : winner.name + " WINS";
+            String text;
+            Color textColor;
+            if (winner == null) {
+                text = "YOU WERE ELIMINATED";
+                textColor = Color.WHITE;
+            } else if (winner == game.human) {
+                text = "YOU WIN!";
+                textColor = winner.color;
+            } else {
+                text = winner.name + " WINS";
+                textColor = winner.color;
+            }
 
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setColor(new Color(0, 0, 0, 150));
             g2.fillRect(0, 0, getWidth(), getHeight());
 
-            g2.setFont(new Font("SansSerif", Font.BOLD, 64));
+            g2.setFont(new Font("SansSerif", Font.BOLD, 56));
             FontMetrics fm = g2.getFontMetrics();
-            g2.setColor(winner.color);
+            g2.setColor(textColor);
             g2.drawString(text, (getWidth() - fm.stringWidth(text)) / 2, getHeight() / 2);
             g2.dispose();
         }

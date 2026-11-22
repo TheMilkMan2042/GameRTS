@@ -12,7 +12,7 @@ import java.util.Set;
 import static org.blake.GameSettings.*;
 import static org.blake.World.ORTHO;
 
-// Everything about growing a player's territory over land.
+// Everything about growing a player's territory: over free land, and into other players' land.
 public class Expansion {
     private final Game game;
     private final World world;
@@ -31,6 +31,23 @@ public class Expansion {
                 if (n != null && n.getOwner() == null && !n.isWater() && !n.isPending()) {
                     frontier.add(n);
                 }
+            }
+        }
+        return new ArrayList<>(frontier);
+    }
+
+    // Enemy-owned tiles touching any of the player's tiles. Pass a victim to include only
+    // that player's tiles, or null for any other player.
+    List<Entity> getEnemyFrontier(Player p, Player victim) {
+        Set<Entity> frontier = new LinkedHashSet<>();
+        for (Entity t : p.tiles) {
+            for (int[] o : ORTHO) {
+                Entity n = world.getEntityAt(t.row + o[0], t.col + o[1]);
+                if (n == null) continue;
+                Player owner = n.getOwner();
+                if (owner == null || owner == p) continue;
+                if (victim != null && owner != victim) continue;
+                frontier.add(n);
             }
         }
         return new ArrayList<>(frontier);
@@ -102,6 +119,45 @@ public class Expansion {
         return claimed;
     }
 
+    // Attack: takes the target owner's tiles in waves, closest to the target first.
+    // Each enemy tile costs ATTACK_COST_PER_TILE. Returns how many tiles were captured.
+    int attackToward(Player p, Entity target) {
+        Player victim = target.getOwner();
+        if (victim == null || victim == p) return 0;
+
+        int budget = (int) ((p.power / 2.0) / ATTACK_COST_PER_TILE);
+        if (budget < 1) return 0;
+        budget = Math.min(budget, MAX_ATTACK_TILES_PER_CLICK);
+
+        int captured = 0;
+        while (captured < budget && p.power >= ATTACK_COST_PER_TILE && !game.isGameOver()) {
+            List<Entity> frontier = getEnemyFrontier(p, victim);
+            if (frontier.isEmpty()) break;
+
+            frontier.sort(Comparator.comparingDouble(e ->
+                    Math.hypot(e.row - target.row, e.col - target.col)
+            ));
+            if (frontier.size() > MAX_FRONTIER_CANDIDATES) {
+                frontier = frontier.subList(0, MAX_FRONTIER_CANDIDATES);
+            }
+
+            int capturedThisWave = 0;
+            for (Entity e : frontier) {
+                if (captured >= budget || p.power < ATTACK_COST_PER_TILE || game.isGameOver()) break;
+                if (e.getOwner() != victim) continue;
+
+                game.claimTile(e, p);
+                p.power -= ATTACK_COST_PER_TILE;
+                captured++;
+                capturedThisWave++;
+            }
+            if (capturedThisWave == 0) break;
+        }
+
+        game.requestRepaint();
+        return captured;
+    }
+
     private Entity findNearestOwnedTile(Player p, double refRow, double refCol) {
         Entity closest = null;
         double closestDist = Double.MAX_VALUE;
@@ -137,9 +193,10 @@ public class Expansion {
         expandAlongAngle(p, anchor, baseAngle);
     }
 
-    // Core arrow logic (bots can call this directly with an anchor tile and an angle).
+    // Core arrow ("spear") logic. Has a cooldown, which only starts if tiles were actually claimed.
     void expandAlongAngle(Player p, Entity anchor, double baseAngle) {
-        if (p.getSpearCooldownRemainingMs() > 0) return;
+        if (p.getSpearCooldownRemainingMs() > 0) return; // still on cooldown
+
         double centerRow = anchor.row;
         double centerCol = anchor.col;
 
@@ -230,6 +287,7 @@ public class Expansion {
         if (claimed > 0) {
             p.spearReadyAt = System.currentTimeMillis() + SPEAR_COOLDOWN_MS;
         }
+
         game.requestRepaint();
     }
 }

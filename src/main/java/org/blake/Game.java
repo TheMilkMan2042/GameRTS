@@ -98,7 +98,15 @@ public class Game {
 
     // Click claiming: expand over land if the tile is reachable, otherwise try a boat.
     void tryClaim(Player p, Entity entity) {
-        if (entity.getOwner() != null || entity.isWater() || entity.isPending()) return;
+        if (entity.isWater() || entity.isPending()) return;
+
+        Player owner = entity.getOwner();
+        if (owner == p) return;
+        if (owner != null) {
+            expansion.attackToward(p, entity); // another player's tile: attack
+            return;
+        }
+
         if (p.power < 1.0) return;
 
         if (expansion.isLandReachable(p, entity, MAX_EXPANSION_RANGE)) {
@@ -185,25 +193,32 @@ public class Game {
     // The ONE place tile ownership changes, so each player's tile set never drifts out of sync.
     // (Attacks and the cut-off-territory rule can reuse this later to transfer tiles.)
     void claimTile(Entity e, Player p) {
-        if (gameOver && p != null) return; // map is frozen after someone wins
+        if (gameOver && p != null) return; // map is frozen after the game ends
+        Player old = e.getOwner();
         assignOwner(e, p);
         if (p != null) {
             fillEnclosedRegions(e, p);
             checkWin(p);
+        }
+        if (old == human && old != p && human.tiles.isEmpty()) {
+            endGame(null); // the human lost their last tile
         }
     }
 
     //Checks if owned = the amount necessary to win
 
     private void checkWin(Player p) {
+        if (getOwnedPercent(p) >= WIN_PERCENT) endGame(p);
+    }
+
+    // winningPlayer == null means the human was eliminated.
+    private void endGame(Player winningPlayer) {
         if (gameOver) return;
-        if (getOwnedPercent(p) >= WIN_PERCENT) {
-            gameOver = true;
-            winner = p;
-            if (powerTimer != null) powerTimer.stop();
-            for (Timer t : botTimers) t.stop();
-            requestRepaint();
-        }
+        gameOver = true;
+        winner = winningPlayer;
+        if (powerTimer != null) powerTimer.stop();
+        for (Timer t : botTimers) t.stop();
+        requestRepaint();
     }
 
     boolean isGameOver() {

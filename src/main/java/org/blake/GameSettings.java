@@ -25,6 +25,13 @@ public final class GameSettings {
     // How long (in ms) a player must wait between spear (drag arrow) uses.
     public static final int SPEAR_COOLDOWN_MS = 10000;
 
+    // --- Attacking other players ---
+// Power cost per enemy tile captured (normal expansion costs 1).
+    public static final double ATTACK_COST_PER_TILE = 2.0;
+    public static final int MAX_ATTACK_TILES_PER_CLICK = 20;
+    // Chance per bot turn to attack a neighbor even while free land remains.
+    public static final double BOT_ATTACK_CHANCE = 0.25;
+
     // --- Power ---
     public static final int POWER_TICK_MS = 1000;
     // Rate = BASE + MAX_BONUS * (1 - e^(-tiles / SCALE)). Each extra tile adds exponentially
