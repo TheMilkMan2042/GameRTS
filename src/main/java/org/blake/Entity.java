@@ -32,6 +32,12 @@ public class Entity {
         g.setColor(fill);
         g.fillRect(x, y, size, size);
 
+        // A boat is on its way to this owned tile: mark it so the landing is visible.
+        if (pending && owner != null) {
+            g.setColor(PENDING_COLOR);
+            g.fillRect(x + size / 4, y + size / 4, size / 2, size / 2);
+        }
+
         g.setColor(Color.BLACK);
         g.drawRect(x, y, size, size);
     }

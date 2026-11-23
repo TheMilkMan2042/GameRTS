@@ -23,19 +23,22 @@ public class Game {
     final Expansion expansion;
     final Boats boats;
     final BotController bots;
+    final CutOffRule cutOff;
 
-    private boolean gameOver = false;
-    private Player winner = null;
-    private Timer powerTimer;
-    private final List<Timer> botTimers = new ArrayList<>();
     private final double maxPower;
     private final int landTileCount;
     private final Runnable onChange; // called whenever something changes and the screen needs a repaint
+
+    private boolean gameOver = false;
+    private Player winner = null; // null with gameOver = true means the human was eliminated
+    private Timer powerTimer;
+    private final List<Timer> botTimers = new ArrayList<>();
 
     public Game(World world, long seed, int botCount, Runnable onChange) {
         this.world = world;
         this.random = new Random(seed);
         this.onChange = onChange;
+        this.cutOff = new CutOffRule(this); // must exist before any tiles are claimed
         this.maxPower = (world.rows * world.cols) / MAX_POWER_DIVISOR;
 
         TerrainGenerator.generate(world, random);
@@ -59,7 +62,9 @@ public class Game {
         this.bots = new BotController(this);
     }
 
+    // Every action ends here. Cut-off checks run first, so the screen never shows a stale split.
     void requestRepaint() {
+        cutOff.resolveAll();
         onChange.run();
     }
 
@@ -96,14 +101,29 @@ public class Game {
         expansion.expandInDirection(human, start, dx, dy);
     }
 
-    // Click claiming: expand over land if the tile is reachable, otherwise try a boat.
+    // Click claiming: attack if the tile belongs to someone else, otherwise expand over land
+    // if the tile is reachable, otherwise try a boat.
     void tryClaim(Player p, Entity entity) {
         if (entity.isWater() || entity.isPending()) return;
 
         Player owner = entity.getOwner();
         if (owner == p) return;
         if (owner != null) {
-            expansion.attackToward(p, entity); // another player's tile: attack
+            // Another player's tile. Attack on foot if there's a land route to it...
+            if (expansion.isLandReachableThroughEnemy(p, entity, MAX_EXPANSION_RANGE)) {
+                if (expansion.attackToward(p, entity) > 0) return;
+                // Borders them but can't afford a push yet: wait rather than sailing.
+                if (!expansion.getEnemyFrontier(p, owner).isEmpty()) return;
+            }
+
+            // ...otherwise land a boat on it.
+            if (p.power < ATTACK_COST_PER_TILE) return;
+            if (p.activeBoats >= p.getMaxBoats()) return;
+
+            Entity boatSource = boats.findBoatSource(p, entity);
+            if (boatSource != null) {
+                boats.launchBoat(p, boatSource, entity);
+            }
             return;
         }
 
@@ -122,7 +142,7 @@ public class Game {
         }
     }
 
-    // ---------- Power ----------
+    // ---------- Power and score ----------
 
     // Power per second. Climbs quickly at first, then flattens toward BASE + MAX_BONUS,
     // so the 1000th tile is worth far less than the 10th.
@@ -131,13 +151,34 @@ public class Game {
         return POWER_BASE_RATE + bonus;
     }
 
-    // ---------- Tiles Owned ----------
-
+    // Percent of all land tiles (water excluded) this player owns.
     double getOwnedPercent(Player p) {
-        if (landTileCount == 0) {
-            return 0;
-        }
+        if (landTileCount == 0) return 0;
         return 100.0 * p.tiles.size() / landTileCount;
+    }
+
+    // ---------- End of game ----------
+
+    boolean isGameOver() {
+        return gameOver;
+    }
+
+    Player getWinner() {
+        return winner;
+    }
+
+    void checkWin(Player p) {
+        if (getOwnedPercent(p) >= WIN_PERCENT) endGame(p);
+    }
+
+    // winningPlayer == null means the human was eliminated.
+    private void endGame(Player winningPlayer) {
+        if (gameOver) return;
+        gameOver = true;
+        winner = winningPlayer;
+        if (powerTimer != null) powerTimer.stop();
+        for (Timer t : botTimers) t.stop();
+        requestRepaint();
     }
 
     // ---------- Starting territories ----------
@@ -190,48 +231,36 @@ public class Game {
 
     // ---------- Ownership ----------
 
-    // The ONE place tile ownership changes, so each player's tile set never drifts out of sync.
-    // (Attacks and the cut-off-territory rule can reuse this later to transfer tiles.)
+    // The ONE place a normal claim or capture happens, so each player's tile set never drifts
+    // out of sync and the follow-up rules (enclosed land, win, elimination, cut-offs) always run.
     void claimTile(Entity e, Player p) {
         if (gameOver && p != null) return; // map is frozen after the game ends
+
         Player old = e.getOwner();
         assignOwner(e, p);
+
         if (p != null) {
+            // Players this claim may have split: whoever lost the tile, and anyone whose land touches it.
+            if (old != null && old != p) cutOff.markDirty(old);
+            for (int[] o : ORTHO) {
+                Entity nb = world.getEntityAt(e.row + o[0], e.col + o[1]);
+                if (nb != null && nb.getOwner() != null && nb.getOwner() != p) {
+                    cutOff.markDirty(nb.getOwner());
+                }
+            }
+
             fillEnclosedRegions(e, p);
             checkWin(p);
         }
+
         if (old == human && old != p && human.tiles.isEmpty()) {
             endGame(null); // the human lost their last tile
         }
     }
 
-    //Checks if owned = the amount necessary to win
-
-    private void checkWin(Player p) {
-        if (getOwnedPercent(p) >= WIN_PERCENT) endGame(p);
-    }
-
-    // winningPlayer == null means the human was eliminated.
-    private void endGame(Player winningPlayer) {
-        if (gameOver) return;
-        gameOver = true;
-        winner = winningPlayer;
-        if (powerTimer != null) powerTimer.stop();
-        for (Timer t : botTimers) t.stop();
-        requestRepaint();
-    }
-
-    boolean isGameOver() {
-        return gameOver;
-    }
-
-    Player getWinner() {
-        return winner;
-    }
-
-    // Raw ownership change with no side effects (used directly when filling a region,
-    // so filling doesn't re-trigger itself tile by tile).
-    private void assignOwner(Entity e, Player p) {
+    // Raw ownership change with no side effects (used directly when filling a region or handing
+    // over a cut-off section, so those don't re-trigger the rules tile by tile).
+    void assignOwner(Entity e, Player p) {
         Player old = e.getOwner();
         if (old != null) old.tiles.remove(e);
         e.setOwner(p);

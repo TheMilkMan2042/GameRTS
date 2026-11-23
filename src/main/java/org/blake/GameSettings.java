@@ -30,13 +30,13 @@ public final class GameSettings {
     public static final double ATTACK_COST_PER_TILE = 1.25;
     public static final int MAX_ATTACK_TILES_PER_CLICK = 50;
     // Chance per bot turn to attack a neighbor even while free land remains.
-    public static final double BOT_ATTACK_CHANCE = 0.25;
+    public static final double BOT_ATTACK_CHANCE = 0.5;
 
     // --- Power ---
     public static final int POWER_TICK_MS = 1000;
     // Rate = BASE + MAX_BONUS * (1 - e^(-tiles / SCALE)). Each extra tile adds exponentially
     // less than the last, and the rate can never exceed BASE + MAX_BONUS.
-    public static final double POWER_BASE_RATE = 1;
+    public static final double POWER_BASE_RATE = 2;
     // The most extra power/sec territory can ever add (the rate cap, minus the base).
     public static final double POWER_RATE_MAX_BONUS = 100.0;
     // Derived so the very first tiles still give +0.05/sec each.

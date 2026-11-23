@@ -56,6 +56,16 @@ public class Expansion {
     // True if the target can be reached by walking over land (unowned or the player's own)
     // from the player's territory within maxRange steps.
     boolean isLandReachable(Player p, Entity target, int maxRange) {
+        return reachable(p, target, maxRange, null);
+    }
+
+    // Same, but the walk may also pass through the target owner's land. Used to decide
+    // whether an enemy tile can be attacked on foot or needs a boat.
+    boolean isLandReachableThroughEnemy(Player p, Entity target, int maxRange) {
+        return reachable(p, target, maxRange, target.getOwner());
+    }
+
+    private boolean reachable(Player p, Entity target, int maxRange, Player through) {
         boolean[] visited = new boolean[world.entities.size()];
         Deque<int[]> queue = new ArrayDeque<>(); // {entityIndex, depth}
 
@@ -75,7 +85,8 @@ public class Expansion {
 
             for (int[] o : ORTHO) {
                 Entity n = world.getEntityAt(curEntity.row + o[0], curEntity.col + o[1]);
-                if (n != null && !n.isWater() && (n.getOwner() == null || n.getOwner() == p)) {
+                if (n != null && !n.isWater()
+                        && (n.getOwner() == null || n.getOwner() == p || n.getOwner() == through)) {
                     int nIdx = world.indexOf(n);
                     if (!visited[nIdx]) {
                         visited[nIdx] = true;
@@ -193,7 +204,9 @@ public class Expansion {
         expandAlongAngle(p, anchor, baseAngle);
     }
 
-    // Core arrow ("spear") logic. Has a cooldown, which only starts if tiles were actually claimed.
+    // Core arrow ("spear") logic. The line extends from the border in the dragged direction,
+    // claiming free land and capturing enemy land along the way (but never crossing water).
+    // Has a cooldown, which only starts if tiles were actually claimed.
     void expandAlongAngle(Player p, Entity anchor, double baseAngle) {
         if (p.getSpearCooldownRemainingMs() > 0) return; // still on cooldown
 
@@ -219,8 +232,8 @@ public class Expansion {
                 Entity current = world.getEntityAt((int) Math.round(stepRow), (int) Math.round(stepCol));
                 if (current == null) break;
                 if (current.getOwner() != p) {
-                    // Land nobody owns is a valid start; water or an enemy's tile blocks this angle.
-                    if (!current.isWater() && current.getOwner() == null) {
+                    // Free land or an enemy's land is a valid start; only water blocks this angle.
+                    if (!current.isWater()) {
                         borderTile = current;
                         dirRow = testDirRow;
                         dirCol = testDirCol;
@@ -234,21 +247,25 @@ public class Expansion {
 
         if (borderTile == null) return;
 
-        int budget = (int) (p.power / 2.0);
-        if (budget < 1) return;
-        budget = Math.min(budget, MAX_CLAIMS_PER_CLICK);
+        // Spend up to half the player's power along the line. Free land costs 1 per tile;
+        // enemy land costs ATTACK_COST_PER_TILE.
+        double spendBudget = p.power / 2.0;
+        if (spendBudget < 1.0) return;
 
         double perpRow = -dirCol;
         double perpCol = dirRow;
 
         double row = borderTile.row;
         double col = borderTile.col;
+        double spent = 0;
         int claimed = 0;
+        int captured = 0; // enemy tiles taken
         int lastRow = Integer.MIN_VALUE;
         int lastCol = Integer.MIN_VALUE;
         int steps = 0;
 
-        while (claimed < budget && p.power >= 1.0 && steps < MAX_ARROW_LENGTH) {
+        while (steps < MAX_ARROW_LENGTH && claimed < MAX_CLAIMS_PER_CLICK
+                && spent + 1.0 <= spendBudget && p.power >= 1.0 && !game.isGameOver()) {
             int roundedRow = (int) Math.round(row);
             int roundedCol = (int) Math.round(col);
 
@@ -259,22 +276,28 @@ public class Expansion {
                 continue;
             }
 
-            // The line must not cross water, the map edge, or another player's land.
+            // The line must not cross water or the map edge, but it can pierce enemy land.
             Entity centerTile = world.getEntityAt(roundedRow, roundedCol);
-            if (centerTile == null || centerTile.isWater()
-                    || (centerTile.getOwner() != null && centerTile.getOwner() != p)) break;
+            if (centerTile == null || centerTile.isWater()) break;
 
             for (int w = -ARROW_WIDTH; w <= ARROW_WIDTH; w++) {
-                if (claimed >= budget || p.power < 1.0) break;
-
                 int tileRow = (int) Math.round(row + perpRow * w);
                 int tileCol = (int) Math.round(col + perpCol * w);
                 Entity current = world.getEntityAt(tileRow, tileCol);
-                if (current == null || current.isWater() || current.getOwner() != null || current.isPending()) continue;
+                if (current == null || current.isWater() || current.isPending() || current.getOwner() == p) continue;
+
+                boolean enemyTile = current.getOwner() != null;
+                double cost = enemyTile ? ATTACK_COST_PER_TILE : 1.0;
+
+                if (enemyTile && captured >= MAX_ATTACK_TILES_PER_CLICK) continue;
+                if (claimed >= MAX_CLAIMS_PER_CLICK || spent + cost > spendBudget || p.power < cost) continue;
+                if (game.isGameOver()) break;
 
                 game.claimTile(current, p);
-                p.power -= 1.0;
+                p.power -= cost;
+                spent += cost;
                 claimed++;
+                if (enemyTile) captured++;
             }
 
             lastRow = roundedRow;

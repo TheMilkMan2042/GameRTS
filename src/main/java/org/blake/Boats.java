@@ -15,9 +15,11 @@ public class Boats {
         this.world = game.world;
     }
 
-    // Spends 1 power, locks the target tile, and claims it when the boat arrives (unless it sinks).
+    // Spends power (1 for free land, ATTACK_COST_PER_TILE for an enemy's tile), locks the target
+    // tile, and claims or captures it when the boat arrives (unless it sinks).
     void launchBoat(Player p, Entity source, Entity target) {
-        p.power -= 1.0;
+        double cost = (target.getOwner() != null) ? ATTACK_COST_PER_TILE : 1.0;
+        p.power -= cost;
         p.activeBoats++;
         target.setPending(true);
 
@@ -30,7 +32,7 @@ public class Boats {
         Timer captureTimer = new Timer(delayMs, ev -> {
             target.setPending(false);
             p.activeBoats--;
-            if (!sunk && target.getOwner() == null) {
+            if (!sunk && target.getOwner() != p) {
                 game.claimTile(target, p);
             }
             game.requestRepaint();
