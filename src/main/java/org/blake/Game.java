@@ -4,6 +4,8 @@ import javax.swing.Timer;
 import java.awt.Point;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -50,8 +52,19 @@ public class Game {
         this.landTileCount = land;
 
         players.add(new Player(0, "You", PLAYER_COLORS[0], false));
+
+        // Shuffle the personalities so each game has a different mix; they repeat if there are
+        // more bots than personalities.
+        List<Personality> mix = new ArrayList<>(Arrays.asList(Personality.values()));
+        Collections.shuffle(mix, random);
+
         for (int i = 1; i <= botCount; i++) {
-            players.add(new Player(i, "Bot " + i, PLAYER_COLORS[i % PLAYER_COLORS.length], true));
+            Personality personality = mix.get((i - 1) % mix.size());
+            Player bot = new Player(i, "Bot " + i + " (" + personality.label + ")",
+                    PLAYER_COLORS[i % PLAYER_COLORS.length], true);
+            bot.personality = personality;
+            players.add(bot);
+            System.out.println(bot.name); // so you can see who you're up against
         }
         this.human = players.get(0);
 
@@ -241,7 +254,10 @@ public class Game {
 
         if (p != null) {
             // Players this claim may have split: whoever lost the tile, and anyone whose land touches it.
-            if (old != null && old != p) cutOff.markDirty(old);
+            if (old != null && old != p) {
+                cutOff.markDirty(old);
+                old.lastAttackedBy.put(p, System.currentTimeMillis()); // bots remember who hit them
+            }
             for (int[] o : ORTHO) {
                 Entity nb = world.getEntityAt(e.row + o[0], e.col + o[1]);
                 if (nb != null && nb.getOwner() != null && nb.getOwner() != p) {
