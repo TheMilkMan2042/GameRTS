@@ -208,7 +208,8 @@ public class Expansion {
     // claiming free land and capturing enemy land along the way (but never crossing water).
     // Has a cooldown, which only starts if tiles were actually claimed.
     void expandAlongAngle(Player p, Entity anchor, double baseAngle) {
-        if (p.getSpearCooldownRemainingMs() > 0) return; // still on cooldown
+        if (p.isStunned()) return;                        // can't act while stunned
+        if (p.getSpearCooldownRemainingMs() > 0) return;  // still on cooldown
 
         double centerRow = anchor.row;
         double centerCol = anchor.col;
@@ -260,6 +261,7 @@ public class Expansion {
         double spent = 0;
         int claimed = 0;
         int captured = 0; // enemy tiles taken
+        Set<Player> victims = new LinkedHashSet<>(); // players the spear took land from
         int lastRow = Integer.MIN_VALUE;
         int lastCol = Integer.MIN_VALUE;
         int steps = 0;
@@ -287,6 +289,7 @@ public class Expansion {
                 if (current == null || current.isWater() || current.isPending() || current.getOwner() == p) continue;
 
                 boolean enemyTile = current.getOwner() != null;
+                Player previousOwner = current.getOwner();
                 double cost = enemyTile ? ATTACK_COST_PER_TILE : 1.0;
 
                 if (enemyTile && captured >= MAX_ATTACK_TILES_PER_CLICK) continue;
@@ -297,7 +300,10 @@ public class Expansion {
                 p.power -= cost;
                 spent += cost;
                 claimed++;
-                if (enemyTile) captured++;
+                if (enemyTile) {
+                    captured++;
+                    victims.add(previousOwner);
+                }
             }
 
             lastRow = roundedRow;
@@ -309,6 +315,12 @@ public class Expansion {
 
         if (claimed > 0) {
             p.spearReadyAt = System.currentTimeMillis() + SPEAR_COOLDOWN_MS;
+        }
+
+        // Being speared stuns a player: they can't click, attack, spear or launch boats briefly.
+        long stunUntil = System.currentTimeMillis() + SPEAR_STUN_MS;
+        for (Player victim : victims) {
+            victim.stunnedUntil = stunUntil;
         }
 
         game.requestRepaint();

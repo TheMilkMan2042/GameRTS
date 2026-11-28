@@ -117,6 +117,7 @@ public class Game {
     // Click claiming: attack if the tile belongs to someone else, otherwise expand over land
     // if the tile is reachable, otherwise try a boat.
     void tryClaim(Player p, Entity entity) {
+        if (p.isStunned()) return; // speared recently: can't act yet
         if (entity.isWater() || entity.isPending()) return;
 
         Player owner = entity.getOwner();

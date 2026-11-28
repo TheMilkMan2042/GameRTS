@@ -17,6 +17,7 @@ public class Player {
     double power = 1.0;
     int activeBoats = 0;
     long spearReadyAt = 0; // timestamp (ms) when the spear can be used again
+    long stunnedUntil = 0; // timestamp (ms) until which this player can't act (set when speared)
 
     // Bots only: how they pick fights, and when each player last captured one of their tiles.
     Personality personality = Personality.AGGRESSOR;
@@ -38,5 +39,9 @@ public class Player {
 
     public long getSpearCooldownRemainingMs() {
         return Math.max(0, spearReadyAt - System.currentTimeMillis());
+    }
+
+    public boolean isStunned() {
+        return System.currentTimeMillis() < stunnedUntil;
     }
 }

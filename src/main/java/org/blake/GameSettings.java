@@ -24,6 +24,8 @@ public final class GameSettings {
     public static final int ARROW_WIDTH = 1;
     // How long (in ms) a player must wait between spear (drag arrow) uses.
     public static final int SPEAR_COOLDOWN_MS = 10000;
+    // How long (in ms) a player is stunned after the spear captures their land.
+    public static final int SPEAR_STUN_MS = 500;
 
     // --- Attacking other players ---
 // Power cost per enemy tile captured (normal expansion costs 1).

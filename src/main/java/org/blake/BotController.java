@@ -23,7 +23,7 @@ public class BotController {
     }
 
     void botTurn(Player bot) {
-        if (bot.tiles.isEmpty()) return;
+        if (bot.tiles.isEmpty() || bot.isStunned()) return;
         if (bot.power < BOT_MIN_POWER) return; // save up for a bigger push
 
         List<Entity> frontier = game.expansion.getFrontier(bot);
@@ -37,6 +37,8 @@ public class BotController {
             if (!border.isEmpty()) {
                 // Borders them: push into their land on foot.
                 Entity target = border.get(game.random.nextInt(border.size()));
+                // Sometimes thrust the spear straight in (cuts a strip and stuns them).
+                if (game.random.nextDouble() < bot.personality.spearChance && trySpear(bot, target)) return;
                 if (game.expansion.attackToward(bot, target) > 0) return;
                 // Couldn't afford a push yet: fall through to peaceful options.
             } else if (tryBotBoat(bot, enemy)) {
@@ -50,8 +52,37 @@ public class BotController {
 
         if (!frontier.isEmpty()) {
             Entity target = frontier.get(game.random.nextInt(frontier.size()));
+            // Sometimes spear a long line out into free land instead of a normal push.
+            if (game.random.nextDouble() < bot.personality.spearChance && trySpear(bot, target)) return;
             game.expansion.expandToward(bot, target);
         }
+    }
+
+    // ---------- Spear ----------
+
+    // Thrusts the spear from one of the bot's tiles through 'target' (a tile next to its territory),
+    // in a straight line away from the territory. Returns true if it claimed anything. Does nothing
+    // while the spear is on cooldown, so callers fall back to a normal move.
+    private boolean trySpear(Player bot, Entity target) {
+        if (bot.getSpearCooldownRemainingMs() > 0) return false;
+
+        Entity anchor = adjacentOwnedTile(bot, target);
+        if (anchor == null) return false;
+
+        // Same convention as the human's drag: angle = atan2(rowChange, colChange).
+        double angle = Math.atan2(target.row - anchor.row, target.col - anchor.col);
+
+        long cooldownBefore = bot.spearReadyAt;
+        game.expansion.expandAlongAngle(bot, anchor, angle);
+        return bot.spearReadyAt != cooldownBefore; // the cooldown only restarts if it claimed something
+    }
+
+    private Entity adjacentOwnedTile(Player bot, Entity e) {
+        for (int[] o : ORTHO) {
+            Entity nb = world.getEntityAt(e.row + o[0], e.col + o[1]);
+            if (nb != null && nb.getOwner() == bot) return nb;
+        }
+        return null;
     }
 
     // ---------- Choosing who to fight ----------
